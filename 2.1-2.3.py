@@ -4,73 +4,72 @@ from scipy.interpolate import CubicSpline
 
 # ============================================================
 # ЗАДАНИЕ 1: Интерполяция полиномами Лагранжа и Ньютона
-# Вариант 11, таблица 1
 # ============================================================
 
-# Данные из таблицы 1 для варианта 11
+# Исходные данные таблицы 1, вариант 11
 x1 = np.array([0.21, 0.42, 0.63, 0.84, 1.05, 1.26, 1.47, 1.68, 1.89])
 y1 = np.array([6.5964, 6.3731, 4.7526, 1.2715, 0.7438, 2.5864, 3.6853, 4.8782, 4.6284])
 x_star = 1.383
 
-# Выбираем узлы для полиномов 2-й и 3-й степени (ближайшие к x*)
-# Для 2-й степени: три ближайших узла
-indices_2 = [5, 6, 7]   # x = 1.26, 1.47, 1.68
-x2 = x1[indices_2]
-y2 = y1[indices_2]
+print("="*70)
+print("ЗАДАНИЕ 1: Интерполяция")
+print("\nИсходные данные (таблица 1):")
+print(" i |    x_i    |    y_i")
+for i in range(len(x1)):
+    print(f"{i:2d} | {x1[i]:8.4f} | {y1[i]:8.4f}")
+print(f"\nТочка интерполяции x* = {x_star}")
 
-# Для 3-й степени: четыре ближайших узла
-indices_3 = [4, 5, 6, 7] # x = 1.05, 1.26, 1.47, 1.68
-x3 = x1[indices_3]
-y3 = y1[indices_3]
+# Выбор узлов для полиномов 2-й и 3-й степени (ближайшие к x*)
+# 2-я степень: узлы 5,6,7 (1.26, 1.47, 1.68)
+x2 = x1[[5,6,7]]
+y2 = y1[[5,6,7]]
+# 3-я степень: узлы 4,5,6,7 (1.05, 1.26, 1.47, 1.68)
+x3 = x1[[4,5,6,7]]
+y3 = y1[[4,5,6,7]]
 
-# --- Полином Лагранжа ---
+# Функция Лагранжа
 def lagrange(x, xi, yi):
-    """Вычисляет значение интерполяционного полинома Лагранжа в точке x"""
     n = len(xi)
-    result = 0.0
+    res = 0.0
     for i in range(n):
         term = yi[i]
         for j in range(n):
             if j != i:
                 term *= (x - xi[j]) / (xi[i] - xi[j])
-        result += term
-    return result
+        res += term
+    return res
 
-L2 = lagrange(x_star, x2, y2)
-L3 = lagrange(x_star, x3, y3)
-
-# --- Полином Ньютона с разделёнными разностями ---
+# Функция Ньютона (разделённые разности)
 def newton(x, xi, yi):
-    """Вычисляет значение интерполяционного полинома Ньютона в точке x"""
     n = len(xi)
-    # Таблица разделённых разностей
     F = np.zeros((n, n))
     F[:,0] = yi
     for j in range(1, n):
-        for i in range(n-j):
+        for i in range(n - j):
             F[i,j] = (F[i+1,j-1] - F[i,j-1]) / (xi[i+j] - xi[i])
-    # Вычисление полинома
-    result = F[0,0]
-    product = 1.0
+    res = F[0,0]
+    prod = 1.0
     for k in range(1, n):
-        product *= (x - xi[k-1])
-        result += F[0,k] * product
-    return result
+        prod *= (x - xi[k-1])
+        res += F[0,k] * prod
+    return res
 
+L2 = lagrange(x_star, x2, y2)
+L3 = lagrange(x_star, x3, y3)
 N2 = newton(x_star, x2, y2)
 N3 = newton(x_star, x3, y3)
 
-# Оценка погрешности: используем следующую разделённую разность
-# для 2-й степени: нужна разделённая разность 3-го порядка на 4 точках (берём узлы 3-й степени)
+# Оценка погрешности
+# 2-я степень: разделённая разность 3-го порядка на 4 точках (x3)
 F3 = np.zeros((4,4))
 F3[:,0] = y3
 for j in range(1,4):
     for i in range(4-j):
         F3[i,j] = (F3[i+1,j-1] - F3[i,j-1]) / (x3[i+j] - x3[i])
 omega2 = (x_star - x3[0]) * (x_star - x3[1]) * (x_star - x3[2])
-error_est_2 = abs(F3[0,3] * omega2)   # |f[x0,x1,x2,x3] * (x-x0)(x-x1)(x-x2)|
+err2 = abs(F3[0,3] * omega2)
 
-# Для 3-й степени: нужна разделённая разность 4-го порядка на 5 точках (добавим следующий узел)
+# 3-я степень: разделённая разность 4-го порядка на 5 точках (добавляем узел 3: x=0.84)
 x4 = x1[[3,4,5,6,7]]   # 0.84,1.05,1.26,1.47,1.68
 y4 = y1[[3,4,5,6,7]]
 F4 = np.zeros((5,5))
@@ -79,107 +78,131 @@ for j in range(1,5):
     for i in range(5-j):
         F4[i,j] = (F4[i+1,j-1] - F4[i,j-1]) / (x4[i+j] - x4[i])
 omega3 = (x_star - x4[0]) * (x_star - x4[1]) * (x_star - x4[2]) * (x_star - x4[3])
-error_est_3 = abs(F4[0,4] * omega3)
+err3 = abs(F4[0,4] * omega3)
 
-print("="*60)
-print("ЗАДАНИЕ 1: Интерполяция")
-print(f"x* = {x_star}")
-print(f"Полином Лагранжа 2-й степени: L2({x_star}) = {L2:.6f}")
-print(f"Полином Лагранжа 3-й степени: L3({x_star}) = {L3:.6f}")
-print(f"Полином Ньютона 2-й степени: N2({x_star}) = {N2:.6f}")
-print(f"Полином Ньютона 3-й степени: N3({x_star}) = {N3:.6f}")
-print(f"Оценка погрешности 2-й степени: ~ {error_est_2:.6f}")
-print(f"Оценка погрешности 3-й степени: ~ {error_est_3:.6f}")
+print("\nРезультаты интерполяции:")
+print(f"Лагранж 2-й степени: L2({x_star}) = {L2:.6f}")
+print(f"Лагранж 3-й степени: L3({x_star}) = {L3:.6f}")
+print(f"Ньютон 2-й степени:  N2({x_star}) = {N2:.6f}")
+print(f"Ньютон 3-й степени:  N3({x_star}) = {N3:.6f}")
+print(f"Оценка погрешности 2-й степени: ~ {err2:.6f}")
+print(f"Оценка погрешности 3-й степени: ~ {err3:.6f}")
 
 # ============================================================
-# ЗАДАНИЕ 2: Естественный кубический сплайн (дефекта 1)
-# Вариант 11, таблица 2
+# ЗАДАНИЕ 2: Естественный кубический сплайн
 # ============================================================
 
-# Данные из таблицы 2 для варианта 11
-x_spline = np.array([-3.00, -2.545, -2.025, -1.31, -0.725, 0.12, 0.90, 1.68, 2.525, 2.98, 3.50])
-y_spline = np.array([-6.382, -4.973, -1.254, -0.187, 0.928, 1.813, 1.054, 0.372, -0.876, -2.972, -3.645])
+x_spl = np.array([-3.00, -2.545, -2.025, -1.31, -0.725, 0.12, 0.90, 1.68, 2.525, 2.98, 3.50])
+y_spl = np.array([-6.382, -4.973, -1.254, -0.187, 0.928, 1.813, 1.054, 0.372, -0.876, -2.972, -3.645])
 x_star2 = 0.524
 
-# Создаём естественный кубический сплайн (вторые производные на концах = 0)
-cs = CubicSpline(x_spline, y_spline, bc_type='natural')
-y_at_star = cs(x_star2)
-
-# Получаем коэффициенты сплайна на каждом отрезке
-# В CubicSpline: на отрезке [x_i, x_{i+1}] полином S_i(x) = a_i + b_i*(x-x_i) + c_i*(x-x_i)^2 + d_i*(x-x_i)^3
-# Коэффициенты лежат в cs.c (shape (4, n-1)): cs.c[k,i] – коэффициент при (x-x_i)^k
-coeffs = cs.c.T   # транспонируем, чтобы каждая строка соответствовала отрезку
-# Коэффициенты: a = y_i, b = coeffs[i,0], c = coeffs[i,1], d = coeffs[i,2]
-# Однако cs.c хранит коэффициенты в порядке: cs.c[0] – свободный член? Проверим документацию:
-# scipy: cs.c содержит коэффициенты для каждого сегмента в виде массива shape (4, n-1), где cs.c[0] – свободный член,
-# cs.c[1] – коэффициент при (x-x_i), cs.c[2] – при (x-x_i)^2, cs.c[3] – при (x-x_i)^3.
-# Поэтому a = cs.c[0,i], b = cs.c[1,i], c = cs.c[2,i], d = cs.c[3,i].
-a_coeff = cs.c[0]
-b_coeff = cs.c[1]
-c_coeff = cs.c[2]
-d_coeff = cs.c[3]
-
-print("\n"+"="*60)
+print("\n" + "="*70)
 print("ЗАДАНИЕ 2: Естественный кубический сплайн")
-print(f"x* = {x_star2}")
-print(f"Значение сплайна S({x_star2}) = {y_at_star:.6f}")
-print("\nКоэффициенты сплайна на каждом отрезке [x_i, x_{i+1}]:")
-print("  i |   x_i      |   a_i       |   b_i       |   c_i       |   d_i")
-for i in range(len(x_spline)-1):
-    print(f"{i:3d} | {x_spline[i]:8.4f} | {a_coeff[i]:10.6f} | {b_coeff[i]:10.6f} | {c_coeff[i]:10.6f} | {d_coeff[i]:10.6f}")
+print("\nИсходные данные (таблица 2):")
+print(" i |    x_i    |    y_i")
+for i in range(len(x_spl)):
+    print(f"{i:2d} | {x_spl[i]:8.4f} | {y_spl[i]:8.4f}")
+print(f"\nТочка x* = {x_star2}")
+
+# Создаём сплайн с естественными граничными условиями
+cs = CubicSpline(x_spl, y_spl, bc_type='natural')
+y_spl_star = cs(x_star2)
+
+# Коэффициенты сплайна
+coeffs = cs.c   # shape (4, n-1): [a, b, c, d] на каждом отрезке (в степенях (x-x_i))
+print(f"\nS({x_star2}) = {y_spl_star:.6f}")
+print("\nКоэффициенты сплайна S_i(x) = a_i + b_i*(x-x_i) + c_i*(x-x_i)^2 + d_i*(x-x_i)^3:")
+print("  i |    x_i    |      a_i      |      b_i      |      c_i      |      d_i")
+for i in range(len(x_spl)-1):
+    print(f"{i:3d} | {x_spl[i]:8.4f} | {coeffs[0,i]:12.6f} | {coeffs[1,i]:12.6f} | {coeffs[2,i]:12.6f} | {coeffs[3,i]:12.6f}")
+
+# Построение графиков сплайна и его производных
+x_plot_spl = np.linspace(x_spl[0], x_spl[-1], 500)
+y_plot_spl = cs(x_plot_spl)
+y_plot_spl_der1 = cs.derivative()(x_plot_spl)
+y_plot_spl_der2 = cs.derivative(2)(x_plot_spl)
+
+plt.figure(figsize=(12, 10))
+
+# График сплайна
+plt.subplot(3,1,1)
+plt.plot(x_plot_spl, y_plot_spl, 'b-', label='Кубический сплайн')
+plt.scatter(x_spl, y_spl, color='red', zorder=5, label='Узлы')
+plt.scatter(x_star2, y_spl_star, color='green', s=100, zorder=5, marker='*', label=f'x* = {x_star2}')
+plt.xlabel('x')
+plt.ylabel('S(x)')
+plt.title('Естественный кубический сплайн (дефект 1)')
+plt.legend()
+plt.grid(True)
+
+# График первой производной
+plt.subplot(3,1,2)
+plt.plot(x_plot_spl, y_plot_spl_der1, 'g-', label='S\'(x)')
+plt.xlabel('x')
+plt.ylabel('S\'(x)')
+plt.title('Первая производная сплайна')
+plt.legend()
+plt.grid(True)
+
+# График второй производной
+plt.subplot(3,1,3)
+plt.plot(x_plot_spl, y_plot_spl_der2, 'r-', label='S\'\'(x)')
+plt.xlabel('x')
+plt.ylabel('S\'\'(x)')
+plt.title('Вторая производная сплайна')
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
 
 # ============================================================
-# ЗАДАНИЕ 3: Аппроксимация методом наименьших квадратов
-# Вариант 11, таблица 3
+# ЗАДАНИЕ 3: Аппроксимация МНК
 # ============================================================
 
-# Данные из таблицы 3 для варианта 11
 x_lsq = np.array([-5.48, -4.73, -3.98, -3.23, -2.48, -1.73, -0.98, -0.23, 0.52, 1.27, 2.02])
 y_lsq = np.array([3.4931, 3.6844, 3.4329, 2.3856, 1.6693, 1.4538, 1.7219, 2.5137, 2.7812, 2.2754, 1.1749])
 x_star3 = 0.024
 
-# Степени многочленов
+print("\n" + "="*70)
+print("ЗАДАНИЕ 3: Аппроксимация методом наименьших квадратов")
+print("\nИсходные данные (таблица 3):")
+print(" i |    x_i    |    y_i")
+for i in range(len(x_lsq)):
+    print(f"{i:2d} | {x_lsq[i]:8.4f} | {y_lsq[i]:8.4f}")
+print(f"\nТочка x* = {x_star3}")
+
 degrees = [1, 2, 3]
 polys = []
-sse = []
-values_at_star = []
+sse_list = []
+values = []
 
-# Построение графиков
-plt.figure(figsize=(10, 6))
-plt.scatter(x_lsq, y_lsq, color='red', label='Исходные данные')
-
-# Для гладкого отображения многочленов
-x_plot = np.linspace(min(x_lsq), max(x_lsq), 200)
-
-print("\n"+"="*60)
-print("ЗАДАНИЕ 3: Естественный кубический сплайн")
 for deg in degrees:
-    # Находим коэффициенты многочлена
     coef = np.polyfit(x_lsq, y_lsq, deg)
     p = np.poly1d(coef)
     polys.append(p)
-    # Вычисляем значение в x*
     val = p(x_star3)
-    values_at_star.append(val)
-    # Сумма квадратов ошибок
+    values.append(val)
     y_pred = p(x_lsq)
-    sse_val = np.sum((y_lsq - y_pred)**2)
-    sse.append(sse_val)
-    # График
-    plt.plot(x_plot, p(x_plot), label=f'Степень {deg}, SSE={sse_val:.3f}')
-    print(f"Многочлен степени {deg}:")
+    sse = np.sum((y_lsq - y_pred)**2)
+    sse_list.append(sse)
+    print(f"\nМногочлен степени {deg}:")
     print(f"  Коэффициенты: {coef}")
     print(f"  P({x_star3}) = {val:.6f}")
-    print(f"  Сумма квадратов ошибок SSE = {sse_val:.6f}")
+    print(f"  Сумма квадратов ошибок SSE = {sse:.6f}")
 
+# График аппроксимации
+plt.figure(figsize=(10,6))
+plt.scatter(x_lsq, y_lsq, color='red', label='Исходные данные', zorder=5)
+x_plot = np.linspace(min(x_lsq), max(x_lsq), 200)
+colors = ['blue', 'green', 'orange']
+for i, deg in enumerate(degrees):
+    plt.plot(x_plot, polys[i](x_plot), color=colors[i], label=f'Степень {deg}, SSE={sse_list[i]:.3f}')
 plt.xlabel('x')
 plt.ylabel('y')
-plt.title('Аппроксимация методом наименьших квадратов')
+plt.title('Аппроксимация МНК (вариант 11)')
 plt.legend()
 plt.grid(True)
-plt.show()
 
-# Также можно вывести таблицу значений
-print("\nСравнение значений в точке x*:")
-for deg, val in zip(degrees, values_at_star):
-    print(f"  Степень {deg}: {val:.6f}")
+# Отображение всех графиков
+plt.tight_layout()
+plt.show()

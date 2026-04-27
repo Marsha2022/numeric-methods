@@ -4,7 +4,7 @@ import numpy as np
 # Задание 7.1. Собственные значения симметричной матрицы (вариант 11)
 # ============================================================================
 
-eps_eig = 1e-4   # <--- добавлено определение переменной
+eps_eig = 1e-4   # точность для методов
 
 # Симметричная матрица 5x5 из таблицы 4, вариант 11
 A_sym = np.array([
@@ -57,38 +57,153 @@ def jacobi_eigen(A, eps=1e-4, max_iter=1000):
 
 print("Метод вращения Якоби:")
 eig_jacobi, iter_jacobi = jacobi_eigen(A_sym.copy(), eps_eig)
-print("Финальная диагональная матрица (собственные значения):")
-print(np.diag(eig_jacobi))
-print("Собственные значения:", eig_jacobi)
+print("Собственные значения (диагональ после преобразований):")
+print(eig_jacobi)
 print("Количество итераций:", iter_jacobi)
 print()
 
-# ---------- 2. QR-алгоритм с остановкой по поддиагонали и изменению диагонали ----------
-def qr_algorithm(A, eps=1e-4, max_iter=1000):
+# ---------- 2. QR-алгоритм ----------
+def householder_qr(A):
+    """Возвращает Q и R для матрицы A методом Хаусхолдера."""
+    m, n = A.shape
+    R = A.copy().astype(float)
+    Q = np.eye(m)
+
+    for k in range(min(m, n)):
+        x = R[k:, k]
+        norm_x = np.linalg.norm(x)
+
+        if norm_x == 0 or len(x) == 1:
+            continue
+
+        if x[0] >= 0:
+            u = x + norm_x * np.eye(len(x))[:, 0]
+        else:
+            u = x - norm_x * np.eye(len(x))[:, 0]
+
+        u_norm = np.linalg.norm(u)
+        if u_norm > 1e-12:
+            v = u / u_norm
+        else:
+            v = u
+
+        for j in range(k, n):
+            dot = 2 * np.dot(v, R[k:, j])
+            R[k:, j] -= dot * v
+
+        for j in range(m):
+            dot = 2 * np.dot(v, Q[k:, j])
+            Q[k:, j] -= dot * v
+
+    return Q.T, R   # Q - ортогональная, R - верхнетреугольная
+
+def qr_algorithm_symmetric(A, epsilon=1e-4, max_iter=1000):
+    """QR-алгоритм для симметричной матрицы."""
     n = A.shape[0]
-    T = A.copy()
-    prev_diag = np.diag(T)
-    for k in range(max_iter):
-        off_diag = np.abs(np.tril(T, -1))
-        max_off = np.max(off_diag) if off_diag.size > 0 else 0.0
-        curr_diag = np.diag(T)
-        diag_change = np.max(np.abs(curr_diag - prev_diag)) if k > 0 else np.inf
-        if max_off < eps and diag_change < eps:
-            return T, k+1
-        Q, R = np.linalg.qr(T)
-        T = R @ Q
-        prev_diag = curr_diag
-    return T, max_iter
+    A_k = A.copy().astype(float)
 
-print("QR-алгоритм:")
-T_qr, iter_qr = qr_algorithm(A_sym.copy(), eps_eig)
-print("Финальная (квази)диагональная матрица:")
-print(T_qr)
-print("Собственные значения (диагональные элементы):", np.diag(T_qr))
-print("Количество итераций:", iter_qr)
-print()
+    print("=" * 70)
+    print("QR-АЛГОРИТМ ДЛЯ ПОИСКА СОБСТВЕННЫХ ЗНАЧЕНИЙ (СИММЕТРИЧНАЯ МАТРИЦА)")
+    print("=" * 70)
 
-# Проверка с помощью numpy
-eig_numpy = np.linalg.eigvalsh(A_sym)
-print("Для проверки (numpy.linalg.eigvalsh):", eig_numpy)
-print("Все собственные значения вещественны (симметричная матрица).")
+    trace_A = np.trace(A)
+    det_A = np.linalg.det(A)
+    print(f"\nАРИФМЕТИЧЕСКАЯ ПРОВЕРКА ИСХОДНОЙ МАТРИЦЫ:")
+    print(f"След матрицы A: {trace_A:.6f}")
+    print(f"Определитель матрицы A: {det_A:.6f}")
+
+    print(f"\nТИП МАТРИЦЫ: СИММЕТРИЧНАЯ (только вещественные корни)")
+    print(f"Критерий сходимости: максимальный поддиагональный элемент < {epsilon}")
+
+    for iteration in range(max_iter):
+        Q, R = householder_qr(A_k)
+        A_next = R @ Q
+
+        max_subdiag = 0.0
+        for i in range(n):
+            for j in range(i):
+                max_subdiag = max(max_subdiag, abs(A_next[i, j]))
+
+        if iteration % 10 == 0:
+            print(f"Итерация {iteration:4d}, max поддиаг = {max_subdiag:.6f}")
+
+        if max_subdiag < epsilon:
+            print(f"\nСОШЛОСЬ на итерации {iteration} (диагональная форма)")
+            final_matrix = A_next
+            break
+
+        A_k = A_next
+    else:
+        print(f"\nДостигнуто максимальное число итераций ({max_iter})")
+        final_matrix = A_k
+
+    return iteration, final_matrix
+
+# Запуск QR-алгоритма
+iterations, final_matrix = qr_algorithm_symmetric(A_sym.copy(), epsilon=eps_eig)
+
+print(f"\nКоличество итераций: {iterations}")
+print("\nФинальная матрица (почти диагональная):")
+for row in final_matrix:
+    print(" ".join(f"{val:10.6f}" for val in row))
+
+eigenvalues_qr = np.diag(final_matrix)
+print("\nСОБСТВЕННЫЕ ЗНАЧЕНИЯ (диагональ финальной матрицы):")
+for i, val in enumerate(eigenvalues_qr):
+    print(f"λ{i+1} = {val:.6f}")
+
+# Проверка через след и определитель
+print("\n" + "=" * 70)
+print("ПРОВЕРКА СОБСТВЕННЫХ ЗНАЧЕНИЙ (QR-алгоритм)")
+print("=" * 70)
+
+trace_A = np.trace(A_sym)
+sum_eigenvals = np.sum(eigenvalues_qr)
+print(f"\n1. ПРОВЕРКА ЧЕРЕЗ СЛЕД МАТРИЦЫ:")
+print(f"   След матрицы A: {trace_A:.6f}")
+print(f"   Сумма собственных значений: {sum_eigenvals:.6f}")
+print(f"   Разница: {abs(trace_A - sum_eigenvals):.2e}")
+
+det_A = np.linalg.det(A_sym)
+prod_eigenvals = np.prod(eigenvalues_qr)
+print(f"\n2. ПРОВЕРКА ЧЕРЕЗ ОПРЕДЕЛИТЕЛЬ:")
+print(f"   Определитель матрицы A: {det_A:.6f}")
+print(f"   Произведение собственных значений: {prod_eigenvals:.6f}")
+print(f"   Разница: {abs(det_A - prod_eigenvals):.2e}")
+
+# ========== ДОБАВЛЕННЫЙ БЛОК: ВЫВОД ОРТОГОНАЛЬНОЙ МАТРИЦЫ QR-РАЗЛОЖЕНИЯ ==========
+print("\n" + "=" * 70)
+print("QR-РАЗЛОЖЕНИЕ ИСХОДНОЙ МАТРИЦЫ (МЕТОД ХАУСХОЛДЕРА)")
+print("=" * 70)
+
+Q, R = householder_qr(A_sym.copy())
+
+print("\nОРТОГОНАЛЬНАЯ МАТРИЦА Q:")
+print(Q)
+print("\nВЕРХНЕТРЕУГОЛЬНАЯ МАТРИЦА R:")
+print(R)
+
+# Проверка: A = Q * R
+A_reconstructed = Q @ R
+print("\nПРОВЕРКА: Q * R (должно быть равно исходной A):")
+print(A_reconstructed)
+print("\nМаксимальная разница |A - Q*R|:", np.max(np.abs(A_sym - A_reconstructed)))
+
+# Проверка ортогональности Q: Q^T * Q = I
+QTQ = Q.T @ Q
+print("\nПРОВЕРКА ОРТОГОНАЛЬНОСТИ Q (Q^T * Q):")
+print(QTQ)
+print("Максимальное отклонение от единичной матрицы:", np.max(np.abs(QTQ - np.eye(Q.shape[0]))))
+# ============================================================================
+
+# Сравнение с numpy
+numpy_vals = np.linalg.eigvalsh(A_sym)
+print("\n" + "=" * 70)
+print("СРАВНЕНИЕ С NUMPY (ДЛЯ ПРОВЕРКИ):")
+print("=" * 70)
+print("Собственные значения от numpy (eigvalsh):")
+for i, val in enumerate(numpy_vals):
+    print(f"λ{i+1} = {val:.6f}")
+
+print("\nМаксимальная разница (QR vs numpy):",
+      np.max(np.abs(np.sort(eigenvalues_qr) - np.sort(numpy_vals))))
